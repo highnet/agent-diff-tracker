@@ -93,6 +93,12 @@ describe('shouldIgnorePath', () => {
     assert.ok(!shouldIgnorePath('pods/x.m', []));
   });
 
+  it('ignores graphify-out and everything under it, at any depth, regardless of user patterns', () => {
+    assert.ok(shouldIgnorePath('graphify-out/cache/stat-index.json', []));
+    assert.ok(shouldIgnorePath('graphify-out/graph.json', []));
+    assert.ok(shouldIgnorePath('packages/app/graphify-out/wiki/index.md', []));
+  });
+
   it('ignores hard-excluded suffixes at any depth regardless of user patterns', () => {
     assert.ok(shouldIgnorePath('tsconfig.tsbuildinfo', []));
     assert.ok(shouldIgnorePath('server.log', []));

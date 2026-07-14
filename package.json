@@ -163,6 +163,7 @@
             "**/*.iml",
             "**/.fleet/**",
             "**/.history/**",
+            "**/graphify-out/**",
             "**/.DS_Store",
             "**/Thumbs.db",
             "**/desktop.ini",

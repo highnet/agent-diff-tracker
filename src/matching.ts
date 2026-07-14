@@ -21,6 +21,7 @@ const HARD_EXCLUDE_SEGMENTS = new Set([
   'DerivedData',
   '.terraform',
   '.idea',
+  'graphify-out',
 ]);
 const HARD_EXCLUDE_SUFFIXES = ['.tsbuildinfo', '.log', '.pyc', '.class', '.o', '.obj'];
 
