@@ -7,6 +7,12 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    ignore:
+      # TypeScript 7 breaks ts-node@10 (it reaches into TS's internal compiler API,
+      # which changed shape) — no compatible ts-node release exists yet. Revisit once
+      # ts-node supports it, or we migrate the test runner off ts-node.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
     schedule:
