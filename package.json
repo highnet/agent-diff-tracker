@@ -1,0 +1,54 @@
+{
+  "name": "agent-diff-tracker",
+  "displayName": "Agent Diff Tracker",
+  "description": "Automatically shows a diff view of the most recently changed file in your workspace, so you can watch what your AI agent is doing in real time.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "agentDiffTracker.toggle",
+        "title": "Agent Diff Tracker: Toggle Watching"
+      },
+      {
+        "command": "agentDiffTracker.showLatest",
+        "title": "Agent Diff Tracker: Show Latest Changed File Diff"
+      }
+    ],
+    "configuration": {
+      "title": "Agent Diff Tracker",
+      "properties": {
+        "agentDiffTracker.debounceMs": {
+          "type": "number",
+          "default": 400,
+          "description": "Milliseconds to wait after a file change before opening its diff (avoids flicker during rapid multi-file writes)."
+        },
+        "agentDiffTracker.exclude": {
+          "type": "array",
+          "default": ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/out/**", "**/.next/**", "**/build/**"],
+          "description": "Glob patterns to ignore when watching for changes."
+        },
+        "agentDiffTracker.preserveFocus": {
+          "type": "boolean",
+          "default": true,
+          "description": "When true, the diff tab opens without stealing editor focus from where you're typing."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}
