@@ -1,9 +1,11 @@
 # Agent Diff Tracker
 
 [![CI](https://github.com/highnet/agent-diff-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/highnet/agent-diff-tracker/actions/workflows/ci.yml)
-[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/JoaquinTelleria.agent-diff-tracker)](https://marketplace.visualstudio.com/items?itemName=JoaquinTelleria.agent-diff-tracker)
+[![VS Code Marketplace](https://img.shields.io/badge/VS%20Code%20Marketplace-Agent%20Diff%20Tracker-blue?logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=JoaquinTelleria.agent-diff-tracker)
 
 **Watch what your AI coding agent is doing, as it does it.**
+
+📦 [**Install from the VS Code Marketplace**](https://marketplace.visualstudio.com/items?itemName=JoaquinTelleria.agent-diff-tracker)
 
 Agent Diff Tracker watches your workspace and automatically opens a diff view (working tree vs. last git commit) for every file that changes — so when Claude Code, Cursor, Copilot, or any other agent edits your code, the diff is already on screen, scrolled to the first changed line. No hunting through the file tree, no guessing what just happened.
 
