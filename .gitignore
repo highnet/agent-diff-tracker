@@ -3,4 +3,4 @@ out/
 out-test/
 *.vsix
 .vscode-test/
-test/integration/fixtures/workspace/.git/
+test/integration/fixtures/workspace/

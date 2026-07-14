@@ -1,5 +1,7 @@
 .vscode/**
 .vscode-test/**
+.claude/**
+.impeccable/**
 src/**
 test/**
 out-test/**
