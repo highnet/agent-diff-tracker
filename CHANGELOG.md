@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/highnet/agent-diff-tracker/compare/v0.4.0...v0.4.1) (2026-07-14)
+
+
+### Bug Fixes
+
+* exclude graphify-out at any depth so its cache/index files never open a diff ([bbdcd2c](https://github.com/highnet/agent-diff-tracker/commit/bbdcd2c66b30137cb0d09a2ab25f7d3017a84bd0))
+
 ## 0.4.0
 
 - Brand-new (untracked) files now open as an all-added diff against an empty baseline — every change gets the same labeled "(Agent Diff Tracker)" tab, no more bare editor tabs.
