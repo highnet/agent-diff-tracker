@@ -16,6 +16,10 @@ const createFixtureWorkspace = (workspacePath: string): void => {
   fs.writeFileSync(path.join(workspacePath, 'tracked-b.txt'), 'b0\n');
   const largeLines = Array.from({ length: 2000 }, (_, i) => `line ${i}`);
   fs.writeFileSync(path.join(workspacePath, 'tracked-large.txt'), largeLines.join('\n') + '\n');
+  fs.writeFileSync(
+    path.join(workspacePath, 'tracked-code.txt'),
+    ["import a from 'a'", '', 'function f() {', '  return 1', '}', ''].join('\n'),
+  );
   const git = (args: string) => execSync(`git ${args}`, { cwd: workspacePath, stdio: 'pipe' });
   git('init -q -b main');
   git('config user.email test@example.com');

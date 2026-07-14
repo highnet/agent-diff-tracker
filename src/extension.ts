@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { HistoryProvider } from './historyProvider';
 import { shouldIgnorePath } from './matching';
 import { shouldAutoOpen, clampDebounceMs } from './batchPlan';
-import { firstChangedLine } from './firstChange';
+import { primaryChangedLine } from './firstChange';
 
 type GitApi = {
   repositories: GitRepository[];
@@ -98,7 +98,7 @@ const openDiffForUri = async (uri: vscode.Uri, options: OpenDiffOptions): Promis
   // unfocused editors, so no focus-stealing/restoring gymnastics are needed (an
   // earlier restore-focus approach could hide or replace the diff tab it had
   // just opened when the previous editor shared the same editor group).
-  const line = firstChangedLine(baseline, current);
+  const line = primaryChangedLine(baseline, current);
   const aim = () => {
     const editor = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === uri.toString());
     if (!editor) return;

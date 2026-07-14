@@ -255,6 +255,41 @@ describe('Agent Diff Tracker (integration)', function () {
     );
   });
 
+  it('jumps to the real code change, not a one-line import addition (the reported UX complaint)', async () => {
+    const filePath = path.join(workspaceRoot(), 'tracked-code.txt');
+
+    const original = fs.readFileSync(filePath, 'utf8');
+    const lines = original.split('\n');
+    // Baseline: ["import a from 'a'", "", "function f() {", "  return 1", "}", ""]
+    // Edit: add one import line near the top, AND substantially rewrite the function body.
+    // A naive "first differing line" scan would stop at the import (line 1) and the user
+    // would never see the actual logic change — that's the bug being fixed here.
+    lines.splice(1, 0, "import b from 'b'");
+    const bodyStart = lines.indexOf('function f() {') + 1;
+    lines.splice(
+      bodyStart,
+      1,
+      '  const x = computeSomething()',
+      '  const y = transformSomething(x)',
+      '  const z = combineResults(x, y)',
+      '  return x + y + z',
+    );
+    fs.writeFileSync(filePath, lines.join('\n'));
+    await sleep(2500);
+
+    const modifiedSide = (e: vscode.TextEditor) =>
+      e.document.uri.scheme === 'file' && e.document.uri.fsPath === filePath;
+    const diffEditor = vscode.window.visibleTextEditors.find(modifiedSide);
+    assert.ok(diffEditor, 'expected the diff modified-side editor to be visible');
+
+    const landedLine = diffEditor!.selection.active.line;
+    assert.notStrictEqual(landedLine, 1, 'should not land on the one-line import addition');
+    assert.ok(
+      landedLine >= bodyStart,
+      `expected the cursor within the rewritten function body (line >= ${bodyStart}), got line ${landedLine}`,
+    );
+  });
+
   it('toggle command flips watching state without error', async () => {
     await assert.doesNotReject(() => Promise.resolve(vscode.commands.executeCommand('agentDiffTracker.toggle')));
     await assert.doesNotReject(() => Promise.resolve(vscode.commands.executeCommand('agentDiffTracker.toggle')));

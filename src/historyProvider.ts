@@ -5,11 +5,12 @@ import { BurstStore, burstLabel, type Burst } from './burstHistory';
 const globalNow = (): number => Date.now();
 
 class FileItem extends vscode.TreeItem {
-  constructor(uri: vscode.Uri, timestamp: number, standalone: boolean) {
+  constructor(uri: vscode.Uri, timestamp: number, standalone: boolean, repeatCount: number) {
     super(uri.path.split('/').pop() ?? uri.fsPath, vscode.TreeItemCollapsibleState.None);
     const relativePath = vscode.workspace.asRelativePath(uri, false);
     const dir = relativePath.includes('/') ? relativePath.slice(0, relativePath.lastIndexOf('/')) : '';
-    const parts = [dir, standalone ? formatTimeAgo(timestamp, globalNow()) : ''].filter(Boolean);
+    const repeat = repeatCount > 1 ? `edited ×${repeatCount}` : '';
+    const parts = [dir, repeat, standalone ? formatTimeAgo(timestamp, globalNow()) : ''].filter(Boolean);
     this.description = parts.join(' · ');
     this.tooltip = relativePath;
     this.resourceUri = uri;
@@ -25,7 +26,7 @@ class FileItem extends vscode.TreeItem {
 
 class BurstNode extends vscode.TreeItem {
   constructor(public readonly burst: Burst<vscode.Uri>, index: number) {
-    super(burstLabel(burst.items.length), vscode.TreeItemCollapsibleState.Expanded);
+    super(burstLabel(burst.items.length, burst.repeatCount), vscode.TreeItemCollapsibleState.Collapsed);
     this.description = formatTimeAgo(burst.timestamp, globalNow());
     this.iconPath = new vscode.ThemeIcon('zap');
     this.contextValue = 'agentDiffTracker.burst';
@@ -37,7 +38,7 @@ class BurstNode extends vscode.TreeItem {
 type HistoryNode = BurstNode | FileItem;
 
 class HistoryProvider implements vscode.TreeDataProvider<HistoryNode>, vscode.Disposable {
-  private readonly store = new BurstStore<vscode.Uri>();
+  private readonly store = new BurstStore<vscode.Uri>((uri) => uri.toString());
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
   // Keeps "3m ago"-style descriptions current without user action.
@@ -63,15 +64,18 @@ class HistoryProvider implements vscode.TreeDataProvider<HistoryNode>, vscode.Di
 
   getChildren(element?: HistoryNode): HistoryNode[] {
     if (element instanceof BurstNode) {
-      return element.burst.items.map((uri) => new FileItem(uri, element.burst.timestamp, false));
+      return element.burst.items.map((uri) => new FileItem(uri, element.burst.timestamp, false, 1));
     }
     if (element) return [];
 
-    // Single-file bursts render flat; multi-file bursts get a collapsible node.
+    // Single-file bursts render flat; multi-file bursts get a collapsible node (collapsed
+    // by default so browsing history doesn't dump every file in every burst on screen).
     return this.store
       .list()
       .map((burst, index) =>
-        burst.items.length === 1 ? new FileItem(burst.items[0], burst.timestamp, true) : new BurstNode(burst, index),
+        burst.items.length === 1
+          ? new FileItem(burst.items[0], burst.timestamp, true, burst.repeatCount)
+          : new BurstNode(burst, index),
       );
   }
 }
