@@ -14,6 +14,8 @@ const createFixtureWorkspace = (workspacePath: string): void => {
   fs.mkdirSync(workspacePath, { recursive: true });
   fs.writeFileSync(path.join(workspacePath, 'tracked.txt'), 'line1\n');
   fs.writeFileSync(path.join(workspacePath, 'tracked-b.txt'), 'b0\n');
+  const largeLines = Array.from({ length: 2000 }, (_, i) => `line ${i}`);
+  fs.writeFileSync(path.join(workspacePath, 'tracked-large.txt'), largeLines.join('\n') + '\n');
   const git = (args: string) => execSync(`git ${args}`, { cwd: workspacePath, stdio: 'pipe' });
   git('init -q -b main');
   git('config user.email test@example.com');

@@ -150,6 +150,46 @@ describe('Agent Diff Tracker (integration)', function () {
     );
   });
 
+  it('jumps to and reveals a change deep in a large file, even when scrolled far away', async () => {
+    const filePath = path.join(workspaceRoot(), 'tracked-large.txt');
+
+    // Open the file first and scroll/position it to the very top — simulates the
+    // user reading line 1 while the agent is about to edit line 1000 elsewhere.
+    const doc = await vscode.workspace.openTextDocument(filePath);
+    const editor = await vscode.window.showTextDocument(doc, { preview: false });
+    editor.selection = new vscode.Selection(0, 0, 0, 0);
+    editor.revealRange(new vscode.Range(0, 0, 0, 0), vscode.TextEditorRevealType.AtTop);
+    await sleep(200);
+    assert.strictEqual(editor.selection.active.line, 0, 'sanity: should start at line 0');
+
+    // Agent edits line 1000 (0-based index 999) of the 2000-line file.
+    const original = fs.readFileSync(filePath, 'utf8');
+    const lines = original.split('\n');
+    lines[999] = 'THE AGENT CHANGED THIS LINE';
+    fs.writeFileSync(filePath, lines.join('\n'));
+    await sleep(2500);
+
+    const modifiedSide = (e: vscode.TextEditor) =>
+      e.document.uri.scheme === 'file' && e.document.uri.fsPath === filePath;
+    const diffEditor = vscode.window.visibleTextEditors.find(modifiedSide);
+    assert.ok(diffEditor, 'expected the diff modified-side editor to be visible after the deep edit');
+
+    assert.strictEqual(
+      diffEditor!.selection.active.line,
+      999,
+      `expected cursor on the changed line (999), got line ${diffEditor!.selection.active.line}`,
+    );
+
+    // Cursor position alone isn't proof of a visible scroll — assert the viewport
+    // actually contains the changed line, not just that the selection moved there
+    // while still scrolled to the top.
+    const revealed = diffEditor!.visibleRanges.some((range) => range.contains(new vscode.Position(999, 0)));
+    assert.ok(
+      revealed,
+      `expected line 999 to be within the visible viewport, got ranges: ${JSON.stringify(diffEditor!.visibleRanges.map((r) => [r.start.line, r.end.line]))}`,
+    );
+  });
+
   it('toggle command flips watching state without error', async () => {
     await assert.doesNotReject(() => Promise.resolve(vscode.commands.executeCommand('agentDiffTracker.toggle')));
     await assert.doesNotReject(() => Promise.resolve(vscode.commands.executeCommand('agentDiffTracker.toggle')));

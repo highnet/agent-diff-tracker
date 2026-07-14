@@ -37,4 +37,23 @@ describe('firstChangedLine', () => {
   it('handles empty baseline with new content', () => {
     assert.strictEqual(firstChangedLine('', 'a\nb\n'), 0);
   });
+
+  it('finds a change deep in a large file (not just near the top)', () => {
+    const lines = Array.from({ length: 2000 }, (_, i) => `line${i}`);
+    const baseline = lines.join('\n') + '\n';
+    const edited = [...lines];
+    edited[999] = 'CHANGED';
+    const current = edited.join('\n') + '\n';
+    assert.strictEqual(firstChangedLine(baseline, current), 999);
+  });
+
+  it('finds only the first of several changes deep in a large file', () => {
+    const lines = Array.from({ length: 2000 }, (_, i) => `line${i}`);
+    const baseline = lines.join('\n') + '\n';
+    const edited = [...lines];
+    edited[999] = 'CHANGED';
+    edited[1500] = 'ALSO CHANGED';
+    const current = edited.join('\n') + '\n';
+    assert.strictEqual(firstChangedLine(baseline, current), 999);
+  });
 });
