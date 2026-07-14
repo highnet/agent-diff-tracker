@@ -30,4 +30,4 @@ npm run reinstall          # build + package + install into local VS Code (user 
 
 ## Releases
 
-Tag `v<version>` after bumping `package.json` + `CHANGELOG.md`; the `release` workflow publishes to the Marketplace (needs `VSCE_PAT` repo secret) and attaches the `.vsix` to a GitHub release. Local installs via `npm run reinstall` are independent of the Marketplace version.
+Automated by release-please: **write Conventional Commit messages** (`fix:` → patch, `feat:` → minor, `feat!:`/`BREAKING CHANGE:` → major; `chore:`/`docs:`/`test:` → no release). Merging to `main` updates a running release PR; merging that PR tags, publishes to the Marketplace (`VSCE_PAT` secret), and attaches the `.vsix` — all inside `release-please.yml` (the publish steps live there because GITHUB_TOKEN-created tags don't trigger the tag-push `release.yml`, which remains only as a manual-tag fallback). Do not hand-edit `CHANGELOG.md` or bump `package.json` version manually. Local installs via `npm run reinstall` are independent of the Marketplace version.

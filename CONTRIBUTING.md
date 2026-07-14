@@ -43,11 +43,19 @@ Every bug fix needs a test that fails without the fix. The integration suite exi
 
 - Keep PRs focused — one behavior change per PR.
 - `npm test` must pass.
-- Update `CHANGELOG.md` under an "Unreleased" heading.
+- **Use [Conventional Commits](https://www.conventionalcommits.org)** — releases are automated from commit messages:
+  - `fix: ...` → patch release
+  - `feat: ...` → minor release
+  - `feat!: ...` or a `BREAKING CHANGE:` footer → major release
+  - `chore:`/`docs:`/`test:`/`refactor:` → no release
 - No new runtime dependencies without prior discussion in an issue — the extension currently has zero, and packaging stays trivial because of it.
 
 ## Releases (maintainers)
 
-1. Bump `version` in `package.json`, move "Unreleased" changelog entries under the new version.
-2. Commit, tag `v<version>`, push the tag.
-3. The `release` GitHub Action packages, publishes to the Marketplace, and attaches the `.vsix` to a GitHub release.
+Releases are fully automated via [release-please](https://github.com/googleapis/release-please):
+
+1. Merge conventional-commit PRs into `main` as usual.
+2. release-please maintains a running **release PR** that accumulates the version bump and changelog entries.
+3. Merging that release PR cuts the tag and GitHub release; the same workflow then runs the full test suite, publishes to the VS Code Marketplace (`VSCE_PAT` secret), and attaches the `.vsix`.
+
+`CHANGELOG.md` is generated from commit messages — don't edit it by hand. The tag-triggered `release` workflow remains as a fallback for manually pushed `v*` tags.

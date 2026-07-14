@@ -1,0 +1,63 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.rp.outputs.release_created }}
+      tag_name: ${{ steps.rp.outputs.tag_name }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: rp
+        with:
+          release-type: node
+
+  # Tags/releases created by release-please use the workflow's GITHUB_TOKEN, which
+  # deliberately does NOT trigger the tag-push release workflow (GitHub recursion
+  # guard) — so publishing happens here, gated on a release actually being cut.
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run compile
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: xvfb-run -a npm run test:integration
+
+      - name: Package
+        run: npx @vscode/vsce package
+
+      - name: Publish to VS Code Marketplace
+        run: npx @vscode/vsce publish --packagePath *.vsix
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Attach .vsix to the release
+        run: gh release upload '${{ needs.release-please.outputs.tag_name }}' *.vsix
+        env:
+          GH_TOKEN: ${{ github.token }}
