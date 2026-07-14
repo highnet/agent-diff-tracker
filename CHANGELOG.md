@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0](https://github.com/highnet/agent-diff-tracker/compare/v0.4.1...v1.0.0) (2026-07-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* removed the agentDiffTracker.maxAutoOpenFiles setting. It's no longer meaningful now that only one diff tab is ever shown. A multi-file burst opens a diff for the last file in the burst only; the rest are still recorded in the Change History sidebar.
+
+### Features
+
+* jump to the largest changed hunk, and tidy up the history view ([f32b156](https://github.com/highnet/agent-diff-tracker/commit/f32b1567ffa79fba0fdb2234148915872980bf30))
+* reuse a single diff tab instead of opening one per file ([de5324a](https://github.com/highnet/agent-diff-tracker/commit/de5324a8ac40132038bd3f36eb55b508bd542754))
+
+
+### Bug Fixes
+
+* pin the changed line to the top of the viewport instead of centering it ([89372c4](https://github.com/highnet/agent-diff-tracker/commit/89372c4e5a6dc3fdf485f21b3de2a56db9ed09f5))
+
 ## [0.4.1](https://github.com/highnet/agent-diff-tracker/compare/v0.4.0...v0.4.1) (2026-07-14)
 
 
