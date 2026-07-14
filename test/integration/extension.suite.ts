@@ -87,23 +87,66 @@ describe('Agent Diff Tracker (integration)', function () {
 
     await vscode.commands.executeCommand('agentDiffTracker.openHistoryItem', uriA);
     await sleep(500);
-    const tabsAfterA = vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => t.label.includes('Agent Diff Tracker'));
-
     await vscode.commands.executeCommand('agentDiffTracker.openHistoryItem', uriB);
     await sleep(500);
-    const tabsAfterB = vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => t.label.includes('Agent Diff Tracker'));
 
     // Regression: history clicks used to reuse a single VS Code "preview" tab, so opening a
-    // second history item silently replaced the first instead of giving it its own tab.
-    assert.ok(
-      tabsAfterB.length > tabsAfterA.length,
-      `expected a second persistent tab after opening a different history item; before: ${tabsAfterA.length}, after: ${tabsAfterB.length}`,
-    );
+    // second history item silently replaced the first. Both files must now have their own
+    // persistent (non-preview) diff tab. (VS Code may promote an existing preview tab for
+    // the same diff rather than adding a new one, so tab COUNT is not a valid assertion.)
+    const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs);
+    const tabA = tabs.find((t) => t.label.includes('tracked.txt') && t.label.includes('Agent Diff Tracker'));
+    const tabB = tabs.find((t) => t.label.includes('tracked-b.txt') && t.label.includes('Agent Diff Tracker'));
+    assert.ok(tabA && !tabA.isPreview, `expected a persistent diff tab for tracked.txt, got: ${JSON.stringify(tabs.map((t) => ({ label: t.label, preview: t.isPreview })))}`);
+    assert.ok(tabB && !tabB.isPreview, 'expected a persistent diff tab for tracked-b.txt');
 
     const activeLabel = vscode.window.tabGroups.activeTabGroup.activeTab?.label ?? '';
     assert.ok(
       activeLabel.includes('tracked-b.txt'),
       `expected focus to remain on the diff the user just opened, got active tab: ${activeLabel}`,
+    );
+  });
+
+  it('opens a labeled diff (not a bare editor) for brand-new untracked files', async () => {
+    const filePath = path.join(workspaceRoot(), 'brand-new-file.txt');
+    fs.writeFileSync(filePath, 'hello\nworld\n');
+    await sleep(2500);
+
+    const titles = vscode.window.tabGroups.all.flatMap((group) => group.tabs.map((tab) => tab.label));
+    // Regression: untracked files used to open as a plain editor tab with no baseline
+    // and no "(Agent Diff Tracker)" label, unlike every other change.
+    assert.ok(
+      titles.some((title) => title.includes('brand-new-file.txt') && title.includes('Agent Diff Tracker')),
+      `expected a labeled diff tab for the new file, got: ${JSON.stringify(titles)}`,
+    );
+  });
+
+  it('re-jumps to the first changed line when an already-open file is edited again', async () => {
+    const filePath = path.join(workspaceRoot(), 'tracked.txt');
+    // First edit: opens the diff, cursor lands on the first change.
+    fs.appendFileSync(filePath, 'edit-one\n');
+    await sleep(2500);
+
+    // Deliberately move the cursor away inside the diff's modified editor. The scheme
+    // filter matters: the diff's LEFT side (git: baseline) shares the same fsPath.
+    const modifiedSide = (e: vscode.TextEditor) => e.document.uri.scheme === 'file' && e.document.uri.fsPath === filePath;
+    const diffEditor = vscode.window.visibleTextEditors.find(modifiedSide);
+    assert.ok(diffEditor, `expected the diff modified-side editor to be visible, visible: ${JSON.stringify(vscode.window.visibleTextEditors.map((e) => e.document.uri.toString()))}`);
+    diffEditor!.selection = new vscode.Selection(0, 0, 0, 0);
+
+    // Second edit while the tab is open: should reset to top and jump to the first change again.
+    fs.appendFileSync(filePath, 'edit-two\n');
+    await sleep(2500);
+
+    const editorAfter = vscode.window.visibleTextEditors.find(modifiedSide);
+    assert.ok(editorAfter, 'diff editor should still be visible after the second edit');
+    // Baseline has 1 committed line, so the first changed line is line index 1.
+    // Regression: the cursor used to stay wherever it was, so nextChange skipped ahead
+    // (or nowhere), leaving the user staring at an unchanged region.
+    assert.strictEqual(
+      editorAfter!.selection.active.line,
+      1,
+      `expected cursor on the first changed line (1), got line ${editorAfter!.selection.active.line}`,
     );
   });
 

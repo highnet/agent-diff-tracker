@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Brand-new (untracked) files now open as an all-added diff against an empty baseline — every change gets the same labeled "(Agent Diff Tracker)" tab, no more bare editor tabs.
+- Editing an already-open file re-aims the cursor at the first changed line, surviving VS Code's asynchronous document reload.
+- Removed the focus-steal/restore approach to diff navigation — it could hide or replace the diff tab it had just opened (including spawning unlabeled duplicate tabs). Cursor aiming now uses the editor API on unfocused editors.
+- History view is now organized by actual change bursts (one entry per agent turn) instead of Today/Yesterday/Earlier day buckets; single-file bursts render flat, multi-file bursts as collapsible groups.
+- Repository, CI (unit + integration on Linux and macOS), tag-driven Marketplace release workflow, dependabot, contribution docs, code of conduct, security policy.
+- Test suite: 63 tests (53 unit + 10 integration), including regressions for every bug above.
+
 ## 0.3.0
 
 - New icon: an eye with a diff-colored iris (marketplace PNG) plus a proper monochrome SVG for the activity bar so it recolors with your theme.

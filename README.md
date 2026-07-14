@@ -1,5 +1,8 @@
 # Agent Diff Tracker
 
+[![CI](https://github.com/highnet/agent-diff-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/highnet/agent-diff-tracker/actions/workflows/ci.yml)
+[![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/JoaquinTelleria.agent-diff-tracker)](https://marketplace.visualstudio.com/items?itemName=JoaquinTelleria.agent-diff-tracker)
+
 **Watch what your AI coding agent is doing, as it does it.**
 
 Agent Diff Tracker watches your workspace and automatically opens a diff view (working tree vs. last git commit) for every file that changes — so when Claude Code, Cursor, Copilot, or any other agent edits your code, the diff is already on screen, scrolled to the first changed line. No hunting through the file tree, no guessing what just happened.
@@ -10,7 +13,7 @@ It's agent-agnostic by design: it reacts to files changing on disk, so it works 
 
 - **Auto-opening diffs** — every change opens a `HEAD ↔ working tree` diff, jumped to the first edited line, without stealing your keyboard focus.
 - **Burst batching** — files changed together (one agent turn) are treated as one batch: diffs open for up to `maxAutoOpenFiles` of them, the rest land in history. A debounce window keeps rapid rewrites from flickering.
-- **Change History sidebar** — an activity-bar view listing recent changes, grouped by *Today / Yesterday / Earlier*, with per-file icons, folder context, relative timestamps, and batch sizes. Click any entry to reopen its diff — each opens in its own tab.
+- **Change History sidebar** — an activity-bar view of recent change bursts: each burst (one agent turn) is a collapsible group of the files it touched, stamped with a relative time. Click any file to reopen its diff — each opens in its own tab.
 - **Manual-edit filtering (optional)** — set `minBurstFilesToAutoOpen` to `2+` and lone single-file saves (usually you typing) stop auto-opening, while multi-file agent bursts still do. Everything is still recorded in history.
 - **Sensible noise filtering** — build output, caches, and dependency directories across ecosystems (Node, Python, Rust, Go, Java, Ruby, .NET, Swift, Elixir, Terraform, and more) are excluded out of the box, with a hard safety net for the worst offenders (`.git`, `node_modules`, `__pycache__`, `target`, `Pods`, `*.tsbuildinfo`, `*.log`, …) that user config can't accidentally disable.
 - **One-click pause** — the status bar eye shows what was last touched; click it to pause/resume watching.
@@ -41,8 +44,8 @@ It's agent-agnostic by design: it reacts to files changing on disk, so it works 
 
 ## FAQ
 
-**Why don't I get diffs for brand-new files?**
-A diff needs two sides. Files with no `HEAD` version (untracked) open as regular editors instead.
+**What about brand-new files?**
+Untracked files diff against an empty baseline, so they open as an all-added diff in the same labeled tab style as everything else.
 
 **It's ignoring a file I care about.**
 Check whether it lives under a hard-excluded directory (`dist`, `build`, `vendor`, …). Those are intentional: agents and build tools write there constantly and the noise would drown the signal. Source files outside those directories are always watched unless your `exclude` globs say otherwise.
@@ -59,4 +62,4 @@ npm test             # unit + VS Code integration tests
 npm run reinstall    # build, package, and install into your local VS Code
 ```
 
-Press `F5` in VS Code for an Extension Development Host with live source.
+Press `F5` in VS Code for an Extension Development Host with live source. See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture rules and the release process.

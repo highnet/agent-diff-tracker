@@ -2,9 +2,17 @@
   "name": "agent-diff-tracker",
   "displayName": "Agent Diff Tracker",
   "description": "Automatically shows a diff view of the files your AI coding agent just changed, with a scrollable history sidebar, so you can watch what it's doing in real time.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "JoaquinTelleria",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/highnet/agent-diff-tracker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/highnet/agent-diff-tracker/issues"
+  },
+  "homepage": "https://github.com/highnet/agent-diff-tracker#readme",
   "icon": "icon.png",
   "galleryBanner": {
     "color": "#141924",
@@ -183,7 +191,7 @@
         "agentDiffTracker.maxHistoryEntries": {
           "type": "number",
           "default": 50,
-          "description": "Maximum number of entries kept in the Change History sidebar."
+          "description": "Maximum number of change bursts kept in the Change History sidebar."
         }
       }
     }

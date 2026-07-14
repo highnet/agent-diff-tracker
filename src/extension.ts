@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { HistoryProvider } from './historyProvider';
 import { shouldIgnorePath } from './matching';
 import { planBatch, clampDebounceMs } from './batchPlan';
+import { firstChangedLine } from './firstChange';
 
 type GitApi = {
   repositories: GitRepository[];
@@ -35,60 +36,82 @@ const toGitHeadUri = (uri: vscode.Uri): vscode.Uri => {
   });
 };
 
-const hasGitBaseline = async (uri: vscode.Uri): Promise<boolean> => {
-  if (!gitApi) return false;
+/** Returns the HEAD content of the file, or undefined when there is no baseline (untracked). */
+const getGitBaseline = async (uri: vscode.Uri): Promise<string | undefined> => {
+  if (!gitApi) return undefined;
   const repo = gitApi.getRepository(uri);
-  if (!repo) return false;
+  if (!repo) return undefined;
   const relativePath = uri.fsPath.slice(repo.rootUri.fsPath.length).replace(/^[/\\]/, '');
   try {
-    await repo.show('HEAD', relativePath);
-    return true;
+    return await repo.show('HEAD', relativePath);
   } catch {
-    return false;
+    return undefined;
   }
 };
 
+// Empty-document scheme used as the left side when a file has no git baseline
+// (untracked/new), so new files still open as a labeled all-added diff instead
+// of a bare editor tab.
+const EMPTY_SCHEME = 'agent-diff-tracker-empty';
+
+const toEmptyBaselineUri = (uri: vscode.Uri): vscode.Uri =>
+  uri.with({ scheme: EMPTY_SCHEME, query: '' });
+
 type OpenDiffOptions = {
   preview: boolean;
-  // When false, the diff becomes and stays the active editor instead of snapping focus
-  // back to whatever was active before — used for explicit user navigation (history
-  // clicks, "show latest") so exploring the history doesn't get yanked away.
-  restoreFocusAfter: boolean;
+  // True for explicit user navigation (history clicks, "show latest") — the diff should
+  // take keyboard focus. Auto-opens leave focus alone per the preserveFocus setting.
+  takeFocus: boolean;
 };
 
 const openDiffForUri = async (uri: vscode.Uri, options: OpenDiffOptions): Promise<void> => {
   const config = vscode.workspace.getConfiguration('agentDiffTracker');
-  const preserveFocus = options.restoreFocusAfter && config.get<boolean>('preserveFocus', true);
+  const preserveFocus = options.takeFocus ? false : config.get<boolean>('preserveFocus', true);
   const fileName = uri.path.split('/').pop() ?? uri.fsPath;
 
-  const canDiff = await hasGitBaseline(uri);
-  const previouslyActive = vscode.window.activeTextEditor;
+  const baseline = await getGitBaseline(uri);
+  // Untracked/new files diff against an empty baseline so every change — new file or
+  // edit — opens the same labeled diff tab.
+  const leftUri = baseline !== undefined ? toGitHeadUri(uri) : toEmptyBaselineUri(uri);
 
-  if (canDiff) {
-    // Open focused (preserveFocus: false) so the diff editor becomes active — required for
-    // compareEditor.nextChange to target it and jump to the first actual edit, not line 1.
-    await vscode.commands.executeCommand(
-      'vscode.diff',
-      toGitHeadUri(uri),
-      uri,
-      `${fileName} (Agent Diff Tracker)`,
-      { preview: options.preview, preserveFocus: false },
-    );
-    try {
-      await vscode.commands.executeCommand('workbench.action.compareEditor.nextChange');
-    } catch {
-      // No-op: some file types (binary, no changes yet) have nothing to navigate to.
-    }
-    if (preserveFocus && previouslyActive) {
-      await vscode.window.showTextDocument(previouslyActive.document, {
-        viewColumn: previouslyActive.viewColumn,
-        preserveFocus: false,
-      });
-    }
-  } else {
-    const doc = await vscode.workspace.openTextDocument(uri);
-    await vscode.window.showTextDocument(doc, { preview: options.preview, preserveFocus });
+  // Read from disk rather than the TextDocument: after an external change the
+  // document model reloads asynchronously and can still hold stale content here.
+  let current: string;
+  try {
+    current = new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
+  } catch {
+    return; // unreadable — nothing sensible to show
   }
+
+  await vscode.commands.executeCommand(
+    'vscode.diff',
+    leftUri,
+    uri,
+    `${fileName} (Agent Diff Tracker)`,
+    { preview: options.preview, preserveFocus },
+  );
+
+  // Aim the cursor at the first changed line via the editor API — it works on
+  // unfocused editors, so no focus-stealing/restoring gymnastics are needed (an
+  // earlier restore-focus approach could hide or replace the diff tab it had
+  // just opened when the previous editor shared the same editor group).
+  const line = firstChangedLine(baseline, current);
+  const aim = () => {
+    const editor = vscode.window.visibleTextEditors.find((e) => e.document.uri.toString() === uri.toString());
+    if (!editor) return;
+    const clamped = Math.min(line, Math.max(0, editor.document.lineCount - 1));
+    const position = new vscode.Position(clamped, 0);
+    editor.selection = new vscode.Selection(position, position);
+    editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+  };
+  aim();
+  // The on-disk change reaches the already-open TextDocument asynchronously, and that
+  // reload restores the editor's previous view state — clobbering the aim above. Re-aim
+  // whenever this document changes during a short settle window.
+  const reAim = vscode.workspace.onDidChangeTextDocument((event) => {
+    if (event.document.uri.toString() === uri.toString()) aim();
+  });
+  setTimeout(() => reAim.dispose(), 1500);
 };
 
 const flushBatch = async (): Promise<void> => {
@@ -99,9 +122,7 @@ const flushBatch = async (): Promise<void> => {
   const config = vscode.workspace.getConfiguration('agentDiffTracker');
   const maxHistory = config.get<number>('maxHistoryEntries', 50);
 
-  for (const uri of batch) {
-    historyProvider.add(uri, batch.length, maxHistory);
-  }
+  historyProvider.addBurst(batch, maxHistory);
   lastChangedUri = batch[batch.length - 1];
 
   const fileNames = batch.map((uri) => uri.path.split('/').pop() ?? uri.fsPath);
@@ -117,7 +138,7 @@ const flushBatch = async (): Promise<void> => {
 
   const toOpen = batch.slice(0, plan.openCount);
   for (const [index, uri] of toOpen.entries()) {
-    await openDiffForUri(uri, { preview: toOpen.length === 1 && index === 0, restoreFocusAfter: true });
+    await openDiffForUri(uri, { preview: toOpen.length === 1 && index === 0, takeFocus: false });
   }
   if (plan.overflowCount > 0) {
     void vscode.window.setStatusBarMessage(
@@ -175,15 +196,16 @@ const activate = async (context: vscode.ExtensionContext): Promise<void> => {
     watcher,
     historyView,
     historyProvider,
+    vscode.workspace.registerTextDocumentContentProvider(EMPTY_SCHEME, { provideTextDocumentContent: () => '' }),
     vscode.commands.registerCommand('agentDiffTracker.toggle', toggleWatching),
     vscode.commands.registerCommand('agentDiffTracker.showLatest', () => {
       // Prefer the still-pending batch (freshest), fall back to the last flushed change.
       const latest = pendingBatch[pendingBatch.length - 1] ?? lastChangedUri;
-      if (latest) void openDiffForUri(latest, { preview: false, restoreFocusAfter: false });
+      if (latest) void openDiffForUri(latest, { preview: false, takeFocus: true });
       else void vscode.window.showInformationMessage('Agent Diff Tracker: no file changes seen yet.');
     }),
     vscode.commands.registerCommand('agentDiffTracker.openHistoryItem', (uri: vscode.Uri) => {
-      void openDiffForUri(uri, { preview: false, restoreFocusAfter: false });
+      void openDiffForUri(uri, { preview: false, takeFocus: true });
     }),
     vscode.commands.registerCommand('agentDiffTracker.clearHistory', () => {
       historyProvider.clear();
