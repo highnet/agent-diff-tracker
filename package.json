@@ -3,7 +3,7 @@
   "displayName": "Agent Diff Tracker",
   "description": "Automatically shows a diff view of the files your AI coding agent just changed, with a scrollable history sidebar, so you can watch what it's doing in real time.",
   "version": "0.2.2",
-  "publisher": "joaquintelleria",
+  "publisher": "JoaquinTelleria",
   "license": "MIT",
   "icon": "icon.png",
   "engines": {
