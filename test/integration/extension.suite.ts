@@ -245,13 +245,18 @@ describe('Agent Diff Tracker (integration)', function () {
       `expected cursor on the changed line (999), got line ${diffEditor!.selection.active.line}`,
     );
 
-    // Cursor position alone isn't proof of a visible scroll — assert the viewport
-    // actually contains the changed line, not just that the selection moved there
-    // while still scrolled to the top.
-    const revealed = diffEditor!.visibleRanges.some((range) => range.contains(new vscode.Position(999, 0)));
+    // The changed line should be pinned near the TOP of the viewport (AtTop reveal), not
+    // centered or just somewhere within it (InCenter would also pass a mere "contains"
+    // check) — the goal is maximizing how much of the diff/following context is visible
+    // below it. VS Code's AtTop leaves a small intentional margin above the target rather
+    // than putting it on the viewport's exact first line, so allow a modest window rather
+    // than asserting exact placement — the real regression this guards against is landing
+    // in the MIDDLE of the viewport (e.g. line ~990-1008 for a ~35-line viewport centered
+    // on 999), which this window excludes.
+    const topLine = diffEditor!.visibleRanges[0]?.start.line;
     assert.ok(
-      revealed,
-      `expected line 999 to be within the visible viewport, got ranges: ${JSON.stringify(diffEditor!.visibleRanges.map((r) => [r.start.line, r.end.line]))}`,
+      topLine !== undefined && topLine <= 999 && topLine >= 999 - 10,
+      `expected the changed line (999) to be at/near the top of the viewport (not centered), got top visible line ${topLine}`,
     );
   });
 

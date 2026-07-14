@@ -105,7 +105,10 @@ const openDiffForUri = async (uri: vscode.Uri, options: OpenDiffOptions): Promis
     const clamped = Math.min(line, Math.max(0, editor.document.lineCount - 1));
     const position = new vscode.Position(clamped, 0);
     editor.selection = new vscode.Selection(position, position);
-    editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+    // AtTop (not InCenter): pins the changed line to the top of the viewport instead of
+    // the middle, so the rest of the visible area shows as much of the diff/following
+    // context as possible rather than wasting half the screen on stuff above the change.
+    editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.AtTop);
   };
   aim();
   // The on-disk change reaches the already-open TextDocument asynchronously, and that
