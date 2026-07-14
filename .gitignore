@@ -1,4 +1,6 @@
 node_modules/
 out/
+out-test/
 *.vsix
 .vscode-test/
+test/integration/fixtures/workspace/.git/

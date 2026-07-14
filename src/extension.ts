@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { HistoryProvider } from './historyProvider';
+import { shouldIgnorePath } from './matching';
+import { planBatch, clampDebounceMs } from './batchPlan';
 
 type GitApi = {
   repositories: GitRepository[];
@@ -15,65 +17,14 @@ let watcher: vscode.FileSystemWatcher | undefined;
 let statusBarItem: vscode.StatusBarItem;
 let batchTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingBatch: vscode.Uri[] = [];
+let lastChangedUri: vscode.Uri | undefined;
 let isWatching = true;
 let gitApi: GitApi | undefined;
 let historyProvider: HistoryProvider;
 
-const HARD_EXCLUDE_SEGMENTS = new Set([
-  '.git',
-  'node_modules',
-  '.next',
-  '.nuxt',
-  '.impeccable',
-  'dist',
-  'out',
-  'build',
-  '__pycache__',
-  '.venv',
-  'venv',
-  '.mypy_cache',
-  '.pytest_cache',
-  '.ruff_cache',
-  'target',
-  '.gradle',
-  'vendor',
-  '.bundle',
-  'Pods',
-  'DerivedData',
-  '.terraform',
-  '.idea',
-]);
-const HARD_EXCLUDE_SUFFIXES = ['.tsbuildinfo', '.log', '.pyc', '.class', '.o', '.obj'];
-
-const DOUBLE_STAR_SLASH = ' DSSLASH ';
-const SLASH_DOUBLE_STAR = ' SLASHDS ';
-const DOUBLE_STAR = ' DS ';
-const SINGLE_STAR = ' STAR ';
-const QUESTION_MARK = ' QM ';
-
-const globToRegex = (pattern: string): RegExp => {
-  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  const withPlaceholders = escaped
-    .replace(/\*\*\//g, DOUBLE_STAR_SLASH)
-    .replace(/\/\*\*/g, SLASH_DOUBLE_STAR)
-    .replace(/\*\*/g, DOUBLE_STAR)
-    .replace(/\*/g, SINGLE_STAR)
-    .replace(/\?/g, QUESTION_MARK);
-  const withRegexSyntax = withPlaceholders
-    .split(DOUBLE_STAR_SLASH).join('(?:.*/)?')
-    .split(SLASH_DOUBLE_STAR).join('(?:/.*)?')
-    .split(DOUBLE_STAR).join('.*')
-    .split(SINGLE_STAR).join('[^/]*')
-    .split(QUESTION_MARK).join('.');
-  return new RegExp(`^${withRegexSyntax}$`);
-};
-
 const shouldIgnore = (uri: vscode.Uri, patterns: string[]): boolean => {
   const relative = vscode.workspace.asRelativePath(uri, false);
-  const segments = relative.split('/');
-  if (segments.some((segment) => HARD_EXCLUDE_SEGMENTS.has(segment))) return true;
-  if (HARD_EXCLUDE_SUFFIXES.some((suffix) => relative.endsWith(suffix))) return true;
-  return patterns.some((pattern) => globToRegex(pattern).test(relative));
+  return shouldIgnorePath(relative, patterns);
 };
 
 const toGitHeadUri = (uri: vscode.Uri): vscode.Uri => {
@@ -97,9 +48,17 @@ const hasGitBaseline = async (uri: vscode.Uri): Promise<boolean> => {
   }
 };
 
-const openDiffForUri = async (uri: vscode.Uri, preview: boolean): Promise<void> => {
+type OpenDiffOptions = {
+  preview: boolean;
+  // When false, the diff becomes and stays the active editor instead of snapping focus
+  // back to whatever was active before — used for explicit user navigation (history
+  // clicks, "show latest") so exploring the history doesn't get yanked away.
+  restoreFocusAfter: boolean;
+};
+
+const openDiffForUri = async (uri: vscode.Uri, options: OpenDiffOptions): Promise<void> => {
   const config = vscode.workspace.getConfiguration('agentDiffTracker');
-  const preserveFocus = config.get<boolean>('preserveFocus', true);
+  const preserveFocus = options.restoreFocusAfter && config.get<boolean>('preserveFocus', true);
   const fileName = uri.path.split('/').pop() ?? uri.fsPath;
 
   const canDiff = await hasGitBaseline(uri);
@@ -113,7 +72,7 @@ const openDiffForUri = async (uri: vscode.Uri, preview: boolean): Promise<void> 
       toGitHeadUri(uri),
       uri,
       `${fileName} (Agent Diff Tracker)`,
-      { preview, preserveFocus: false },
+      { preview: options.preview, preserveFocus: false },
     );
     try {
       await vscode.commands.executeCommand('workbench.action.compareEditor.nextChange');
@@ -128,7 +87,7 @@ const openDiffForUri = async (uri: vscode.Uri, preview: boolean): Promise<void> 
     }
   } else {
     const doc = await vscode.workspace.openTextDocument(uri);
-    await vscode.window.showTextDocument(doc, { preview, preserveFocus });
+    await vscode.window.showTextDocument(doc, { preview: options.preview, preserveFocus });
   }
 };
 
@@ -138,27 +97,31 @@ const flushBatch = async (): Promise<void> => {
   if (batch.length === 0) return;
 
   const config = vscode.workspace.getConfiguration('agentDiffTracker');
-  const minBurstFiles = config.get<number>('minBurstFilesToAutoOpen', 1);
-  const maxAutoOpen = config.get<number>('maxAutoOpenFiles', 4);
   const maxHistory = config.get<number>('maxHistoryEntries', 50);
 
   for (const uri of batch) {
     historyProvider.add(uri, batch.length, maxHistory);
   }
+  lastChangedUri = batch[batch.length - 1];
 
   const fileNames = batch.map((uri) => uri.path.split('/').pop() ?? uri.fsPath);
   statusBarItem.text =
     batch.length > 1 ? `$(diff) Watching: ${batch.length} files changed` : `$(diff) Watching: ${fileNames[0]}`;
 
-  if (batch.length < minBurstFiles) return;
+  const plan = planBatch(
+    batch.length,
+    config.get<number>('minBurstFilesToAutoOpen', 1),
+    config.get<number>('maxAutoOpenFiles', 4),
+  );
+  if (plan.openCount === 0) return;
 
-  const toOpen = batch.slice(0, maxAutoOpen);
+  const toOpen = batch.slice(0, plan.openCount);
   for (const [index, uri] of toOpen.entries()) {
-    await openDiffForUri(uri, toOpen.length === 1 && index === 0);
+    await openDiffForUri(uri, { preview: toOpen.length === 1 && index === 0, restoreFocusAfter: true });
   }
-  if (batch.length > maxAutoOpen) {
+  if (plan.overflowCount > 0) {
     void vscode.window.setStatusBarMessage(
-      `Agent Diff Tracker: ${batch.length - maxAutoOpen} more file(s) changed — see History view`,
+      `Agent Diff Tracker: ${plan.overflowCount} more file(s) changed — see History view`,
       4000,
     );
   }
@@ -175,7 +138,7 @@ const scheduleDiff = (uri: vscode.Uri): void => {
     pendingBatch.push(uri);
   }
 
-  const debounceMs = config.get<number>('debounceMs', 400);
+  const debounceMs = clampDebounceMs(config.get<number>('debounceMs', 400));
   if (batchTimer) clearTimeout(batchTimer);
   batchTimer = setTimeout(() => void flushBatch(), debounceMs);
 };
@@ -211,14 +174,16 @@ const activate = async (context: vscode.ExtensionContext): Promise<void> => {
     statusBarItem,
     watcher,
     historyView,
+    historyProvider,
     vscode.commands.registerCommand('agentDiffTracker.toggle', toggleWatching),
     vscode.commands.registerCommand('agentDiffTracker.showLatest', () => {
-      const [latest] = pendingBatch.length > 0 ? pendingBatch : [];
-      if (latest) void openDiffForUri(latest, true);
+      // Prefer the still-pending batch (freshest), fall back to the last flushed change.
+      const latest = pendingBatch[pendingBatch.length - 1] ?? lastChangedUri;
+      if (latest) void openDiffForUri(latest, { preview: false, restoreFocusAfter: false });
       else void vscode.window.showInformationMessage('Agent Diff Tracker: no file changes seen yet.');
     }),
     vscode.commands.registerCommand('agentDiffTracker.openHistoryItem', (uri: vscode.Uri) => {
-      void openDiffForUri(uri, true);
+      void openDiffForUri(uri, { preview: false, restoreFocusAfter: false });
     }),
     vscode.commands.registerCommand('agentDiffTracker.clearHistory', () => {
       historyProvider.clear();

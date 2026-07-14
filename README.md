@@ -1,52 +1,62 @@
 # Agent Diff Tracker
 
-Watches your workspace for file changes and automatically opens a diff view (working tree vs. last git commit) for the files your AI coding agent just touched — so you can see what it did without hunting through the file tree.
+**Watch what your AI coding agent is doing, as it does it.**
 
-Works with any agent (Claude Code, Cursor, Copilot agent mode, a background script, whatever) since it just reacts to files changing on disk — no agent-specific integration needed.
+Agent Diff Tracker watches your workspace and automatically opens a diff view (working tree vs. last git commit) for every file that changes — so when Claude Code, Cursor, Copilot, or any other agent edits your code, the diff is already on screen, scrolled to the first changed line. No hunting through the file tree, no guessing what just happened.
 
-## How it works
+It's agent-agnostic by design: it reacts to files changing on disk, so it works with **any** tool — AI agents, codegen scripts, formatters, a teammate over SSH — with zero integration or configuration.
 
-- Watches all files in the workspace (excluding `node_modules`, `.git`, build output, etc. — configurable, plus a hard-coded safety exclude for common noisy directories).
-- Groups files that change within a short debounce window into one batch, so a single agent turn that touches several files is treated together rather than as N separate flickers.
-- Auto-opens a diff editor (HEAD vs. working tree) for each file in the batch, up to `maxAutoOpenFiles`. If more files changed than that, the rest are still recorded in the **Change History** sidebar.
-- **Change History** view (its own icon in the activity bar) lists recent changes — click any entry to reopen its diff on demand, even after the auto-opened tab is gone.
-- Optional burst filtering: set `minBurstFilesToAutoOpen` above 1 to skip auto-opening for lone, single-file edits (useful if you also edit manually and only want auto-popups for agent-style multi-file bursts) — those edits still land in history.
-- Status bar item shows what's being watched; click it to pause/resume.
+## Features
+
+- **Auto-opening diffs** — every change opens a `HEAD ↔ working tree` diff, jumped to the first edited line, without stealing your keyboard focus.
+- **Burst batching** — files changed together (one agent turn) are treated as one batch: diffs open for up to `maxAutoOpenFiles` of them, the rest land in history. A debounce window keeps rapid rewrites from flickering.
+- **Change History sidebar** — an activity-bar view listing recent changes, grouped by *Today / Yesterday / Earlier*, with per-file icons, folder context, relative timestamps, and batch sizes. Click any entry to reopen its diff — each opens in its own tab.
+- **Manual-edit filtering (optional)** — set `minBurstFilesToAutoOpen` to `2+` and lone single-file saves (usually you typing) stop auto-opening, while multi-file agent bursts still do. Everything is still recorded in history.
+- **Sensible noise filtering** — build output, caches, and dependency directories across ecosystems (Node, Python, Rust, Go, Java, Ruby, .NET, Swift, Elixir, Terraform, and more) are excluded out of the box, with a hard safety net for the worst offenders (`.git`, `node_modules`, `__pycache__`, `target`, `Pods`, `*.tsbuildinfo`, `*.log`, …) that user config can't accidentally disable.
+- **One-click pause** — the status bar eye shows what was last touched; click it to pause/resume watching.
 
 ## Requirements
 
-- The built-in VS Code Git extension enabled (used to resolve the `HEAD` version of files for the diff).
-- Files outside a git repo, or untracked new files, open the plain file instead of a diff (no baseline to compare against).
+- The built-in VS Code Git extension (used to resolve the `HEAD` side of each diff).
+- Untracked/new files and files outside a git repo open normally instead of as a diff — there's no baseline to compare against.
 
 ## Commands
 
-- `Agent Diff Tracker: Toggle Watching` — pause/resume.
-- `Agent Diff Tracker: Show Latest Changed File Diff` — re-open the diff for the last detected change.
-- `Agent Diff Tracker: Clear History` — empty the Change History sidebar.
+| Command | What it does |
+| --- | --- |
+| `Agent Diff Tracker: Toggle Watching` | Pause/resume (same as clicking the status bar item) |
+| `Agent Diff Tracker: Show Latest Changed File Diff` | Reopen the diff for the most recent change |
+| `Agent Diff Tracker: Clear History` | Empty the Change History view |
 
 ## Settings
 
-- `agentDiffTracker.debounceMs` (default `400`)
-- `agentDiffTracker.exclude` (default excludes `node_modules`, `.git`, `dist`, `out`, `.next`, `build`)
-- `agentDiffTracker.preserveFocus` (default `true`)
-- `agentDiffTracker.minBurstFilesToAutoOpen` (default `1`)
-- `agentDiffTracker.maxAutoOpenFiles` (default `4`)
-- `agentDiffTracker.maxHistoryEntries` (default `50`)
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `agentDiffTracker.debounceMs` | `400` | Quiet window that groups rapid changes into one batch (clamped to 50–10000) |
+| `agentDiffTracker.exclude` | ~70 patterns | Globs to ignore; covers common build/cache/dependency dirs across ecosystems |
+| `agentDiffTracker.preserveFocus` | `true` | Keep your cursor where it is when diffs auto-open |
+| `agentDiffTracker.minBurstFilesToAutoOpen` | `1` | Only auto-open when at least N files change together |
+| `agentDiffTracker.maxAutoOpenFiles` | `4` | Cap on diff tabs opened per batch; the rest go to history |
+| `agentDiffTracker.maxHistoryEntries` | `50` | History length |
+
+## FAQ
+
+**Why don't I get diffs for brand-new files?**
+A diff needs two sides. Files with no `HEAD` version (untracked) open as regular editors instead.
+
+**It's ignoring a file I care about.**
+Check whether it lives under a hard-excluded directory (`dist`, `build`, `vendor`, …). Those are intentional: agents and build tools write there constantly and the noise would drown the signal. Source files outside those directories are always watched unless your `exclude` globs say otherwise.
+
+**Does it work without an AI agent?**
+Yes — it has no idea what changed your files. Formatters, git checkouts, scripts, and teammates all show up the same way.
 
 ## Development
 
 ```bash
 npm install
-npm run compile
+npm run compile      # build
+npm test             # unit + VS Code integration tests
+npm run reinstall    # build, package, and install into your local VS Code
 ```
 
-Press `F5` in VS Code to launch an Extension Development Host with the extension loaded.
-
-## Packaging / installing locally
-
-```bash
-npx @vscode/vsce package --allow-missing-repository --skip-license
-code --install-extension agent-diff-tracker-<version>.vsix
-```
-
-Then run **Developer: Reload Window** in VS Code — installing a `.vsix` while a window is open updates the files on disk, but the running extension host keeps the old code until reloaded.
+Press `F5` in VS Code for an Extension Development Host with live source.

@@ -2,17 +2,35 @@
   "name": "agent-diff-tracker",
   "displayName": "Agent Diff Tracker",
   "description": "Automatically shows a diff view of the files your AI coding agent just changed, with a scrollable history sidebar, so you can watch what it's doing in real time.",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "publisher": "JoaquinTelleria",
   "license": "MIT",
   "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#141924",
+    "theme": "dark"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
-  "keywords": ["ai", "agent", "diff", "git", "copilot", "cursor", "claude"],
-  "activationEvents": ["onStartupFinished"],
-  "extensionDependencies": ["vscode.git"],
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "agent",
+    "diff",
+    "git",
+    "copilot",
+    "cursor",
+    "claude"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "extensionDependencies": [
+    "vscode.git"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -35,7 +53,7 @@
         {
           "id": "agentDiffTracker",
           "title": "Agent Diff Tracker",
-          "icon": "icon.png"
+          "icon": "media/activity-icon.svg"
         }
       ]
     },
@@ -47,6 +65,12 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "agentDiffTracker.history",
+        "contents": "No changes seen yet.\nWhen your AI agent — or anything else — edits a file in this workspace, it shows up here and its diff opens automatically.\nUse the eye item in the status bar (bottom right) to pause or resume watching."
+      }
+    ],
     "menus": {
       "view/title": [
         {
@@ -167,11 +191,21 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "reinstall": "bash ./scripts/reinstall.sh",
+    "test:unit": "mocha --config .mocharc-unit.json",
+    "pretest:integration": "tsc -p ./tsconfig.test.json",
+    "test:integration": "node ./out-test/test/integration/runTests.js",
+    "test": "npm run test:unit && npm run test:integration"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^3.0.0",
+    "glob": "^13.0.6",
+    "mocha": "^11.7.6",
+    "ts-node": "^10.9.2",
     "typescript": "^5.4.0"
   }
 }
