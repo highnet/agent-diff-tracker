@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.2
+
+- Default `exclude` list expanded to cover build/cache/dependency directories across Node, Python, Java/Kotlin, Go, Rust, Ruby, PHP, .NET, Swift/Xcode, Elixir, Terraform, plus common editor/OS cruft (`.idea`, `.DS_Store`, etc.).
+- Hard-coded safety-net excludes (applied regardless of user config) expanded similarly: `__pycache__`, `.venv`, `target`, `.gradle`, `vendor`, `Pods`, `DerivedData`, `.terraform`, `.idea`, plus suffixes `.pyc`, `.class`, `.o`, `.obj`.
+
+## 0.2.1
+
+- `.tsbuildinfo` and `.log` files are now hard-excluded regardless of the `exclude` setting.
+- Diffs now jump to the first actual changed line instead of opening at the top of the file.
+
 ## 0.2.0
 
 - Added a "Change History" sidebar (activity bar icon) listing recent changed files; click any entry to reopen its diff.

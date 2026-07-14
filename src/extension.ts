@@ -19,8 +19,31 @@ let isWatching = true;
 let gitApi: GitApi | undefined;
 let historyProvider: HistoryProvider;
 
-const HARD_EXCLUDE_SEGMENTS = new Set(['.git', 'node_modules', '.next', '.impeccable', 'dist', 'out', 'build']);
-const HARD_EXCLUDE_SUFFIXES = ['.tsbuildinfo', '.log'];
+const HARD_EXCLUDE_SEGMENTS = new Set([
+  '.git',
+  'node_modules',
+  '.next',
+  '.nuxt',
+  '.impeccable',
+  'dist',
+  'out',
+  'build',
+  '__pycache__',
+  '.venv',
+  'venv',
+  '.mypy_cache',
+  '.pytest_cache',
+  '.ruff_cache',
+  'target',
+  '.gradle',
+  'vendor',
+  '.bundle',
+  'Pods',
+  'DerivedData',
+  '.terraform',
+  '.idea',
+]);
+const HARD_EXCLUDE_SUFFIXES = ['.tsbuildinfo', '.log', '.pyc', '.class', '.o', '.obj'];
 
 const DOUBLE_STAR_SLASH = ' DSSLASH ';
 const SLASH_DOUBLE_STAR = ' SLASHDS ';
