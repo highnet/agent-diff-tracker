@@ -1,12 +1,16 @@
 {
   "name": "agent-diff-tracker",
   "displayName": "Agent Diff Tracker",
-  "description": "Automatically shows a diff view of the most recently changed file in your workspace, so you can watch what your AI agent is doing in real time.",
-  "version": "0.0.1",
+  "description": "Automatically shows a diff view of the files your AI coding agent just changed, with a scrollable history sidebar, so you can watch what it's doing in real time.",
+  "version": "0.2.0",
+  "publisher": "joaquintelleria",
+  "license": "MIT",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": ["Other"],
+  "keywords": ["ai", "agent", "diff", "git", "copilot", "cursor", "claude"],
   "activationEvents": ["onStartupFinished"],
   "extensionDependencies": ["vscode.git"],
   "main": "./out/extension.js",
@@ -19,15 +23,46 @@
       {
         "command": "agentDiffTracker.showLatest",
         "title": "Agent Diff Tracker: Show Latest Changed File Diff"
+      },
+      {
+        "command": "agentDiffTracker.clearHistory",
+        "title": "Agent Diff Tracker: Clear History",
+        "icon": "$(clear-all)"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agentDiffTracker",
+          "title": "Agent Diff Tracker",
+          "icon": "icon.png"
+        }
+      ]
+    },
+    "views": {
+      "agentDiffTracker": [
+        {
+          "id": "agentDiffTracker.history",
+          "name": "Change History"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "agentDiffTracker.clearHistory",
+          "when": "view == agentDiffTracker.history",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "Agent Diff Tracker",
       "properties": {
         "agentDiffTracker.debounceMs": {
           "type": "number",
           "default": 400,
-          "description": "Milliseconds to wait after a file change before opening its diff (avoids flicker during rapid multi-file writes)."
+          "description": "Milliseconds to wait after a file change before opening its diff. Multiple files that change within this window are treated as one batch."
         },
         "agentDiffTracker.exclude": {
           "type": "array",
@@ -38,6 +73,21 @@
           "type": "boolean",
           "default": true,
           "description": "When true, the diff tab opens without stealing editor focus from where you're typing."
+        },
+        "agentDiffTracker.minBurstFilesToAutoOpen": {
+          "type": "number",
+          "default": 1,
+          "description": "Minimum number of files that must change together (within debounceMs) before a diff is auto-opened. Set to 2+ to ignore lone manual edits and only react to agent-style bursts; changes below the threshold still appear in the History view."
+        },
+        "agentDiffTracker.maxAutoOpenFiles": {
+          "type": "number",
+          "default": 4,
+          "description": "Maximum number of diff tabs to auto-open at once for a single batch of changes. Remaining files are still recorded in the History view."
+        },
+        "agentDiffTracker.maxHistoryEntries": {
+          "type": "number",
+          "default": 50,
+          "description": "Maximum number of entries kept in the Change History sidebar."
         }
       }
     }
