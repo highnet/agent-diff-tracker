@@ -61,7 +61,7 @@ Yes — it has no idea what changed your files. Formatters, git checkouts, scrip
 npm install
 npm run compile      # build
 npm test             # unit + VS Code integration tests
-npm run reinstall    # build, package, and install into your local VS Code
+npm run reinstall    # build, package, install into your local VS Code, and (on macOS) reload the window automatically
 ```
 
 Press `F5` in VS Code for an Extension Development Host with live source. See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture rules and the release process.

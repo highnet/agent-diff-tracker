@@ -9,7 +9,7 @@ npm run compile            # tsc build → out/
 npm run test:unit          # mocha over test/unit (ts-node, fast)
 npm run test:integration   # @vscode/test-electron — real VS Code + generated git fixture
 npm test                   # both
-npm run reinstall          # build + package + install into local VS Code (user must reload window)
+npm run reinstall          # build + package + install into local VS Code, and auto-reload the window on macOS
 ```
 
 ## Architecture rules
@@ -31,6 +31,10 @@ npm run reinstall          # build + package + install into local VS Code (user 
 - `BurstStore.add` merges a new burst into the previous entry when its fileset (by key, order-independent) exactly matches — this is what keeps the History view from filling up with one row per repeated save to the same file(s). `BurstNode` renders `Collapsed` by default. Don't revert either without a reason; both were explicit UX requests.
 - Config values from settings must be clamped (`batchPlan.ts`) — assume users enter garbage.
 - `.vscodeignore` must exclude tests, sources, and local tool dirs (`.claude/`, `.impeccable/`); verify `.vsix` contents after packaging changes.
+
+## Dev loop
+
+After any source change, run `npm run reinstall` — it compiles, packages, installs into the local `code` CLI's VS Code, and (on macOS) reloads the window automatically via AppleScript (`scripts/reinstall.sh`: focuses VS Code, opens the command palette, runs "Developer: Reload Window"). This is the standing habit for this project: make a change, run it, verify, no manual reload step. If it stops reloading, check that Terminal/the calling app still has Accessibility permission (System Settings → Privacy & Security → Accessibility) — `osascript` needs it to send keystrokes.
 
 ## Releases
 

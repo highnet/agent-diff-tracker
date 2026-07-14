@@ -11,7 +11,7 @@ npm install
 npm run compile
 ```
 
-Press `F5` in VS Code to launch an Extension Development Host with the extension loaded from source. Alternatively, `npm run reinstall` builds, packages, and installs the extension into your regular VS Code (reload the window afterwards).
+Press `F5` in VS Code to launch an Extension Development Host with the extension loaded from source. Alternatively, `npm run reinstall` builds, packages, and installs the extension into your regular VS Code — on macOS it also reloads the window automatically (`scripts/reinstall.sh` drives this via AppleScript: opens the command palette, runs "Developer: Reload Window"), so the loop is just edit → `npm run reinstall` → try it, no manual reload step. On other platforms it prints a reminder to reload manually instead.
 
 ## Project layout
 
