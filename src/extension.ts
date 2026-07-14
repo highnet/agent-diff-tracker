@@ -20,6 +20,7 @@ let gitApi: GitApi | undefined;
 let historyProvider: HistoryProvider;
 
 const HARD_EXCLUDE_SEGMENTS = new Set(['.git', 'node_modules', '.next', '.impeccable', 'dist', 'out', 'build']);
+const HARD_EXCLUDE_SUFFIXES = ['.tsbuildinfo', '.log'];
 
 const DOUBLE_STAR_SLASH = ' DSSLASH ';
 const SLASH_DOUBLE_STAR = ' SLASHDS ';
@@ -48,6 +49,7 @@ const shouldIgnore = (uri: vscode.Uri, patterns: string[]): boolean => {
   const relative = vscode.workspace.asRelativePath(uri, false);
   const segments = relative.split('/');
   if (segments.some((segment) => HARD_EXCLUDE_SEGMENTS.has(segment))) return true;
+  if (HARD_EXCLUDE_SUFFIXES.some((suffix) => relative.endsWith(suffix))) return true;
   return patterns.some((pattern) => globToRegex(pattern).test(relative));
 };
 
@@ -78,15 +80,29 @@ const openDiffForUri = async (uri: vscode.Uri, preview: boolean): Promise<void> 
   const fileName = uri.path.split('/').pop() ?? uri.fsPath;
 
   const canDiff = await hasGitBaseline(uri);
+  const previouslyActive = vscode.window.activeTextEditor;
 
   if (canDiff) {
+    // Open focused (preserveFocus: false) so the diff editor becomes active — required for
+    // compareEditor.nextChange to target it and jump to the first actual edit, not line 1.
     await vscode.commands.executeCommand(
       'vscode.diff',
       toGitHeadUri(uri),
       uri,
       `${fileName} (Agent Diff Tracker)`,
-      { preview, preserveFocus },
+      { preview, preserveFocus: false },
     );
+    try {
+      await vscode.commands.executeCommand('workbench.action.compareEditor.nextChange');
+    } catch {
+      // No-op: some file types (binary, no changes yet) have nothing to navigate to.
+    }
+    if (preserveFocus && previouslyActive) {
+      await vscode.window.showTextDocument(previouslyActive.document, {
+        viewColumn: previouslyActive.viewColumn,
+        preserveFocus: false,
+      });
+    }
   } else {
     const doc = await vscode.workspace.openTextDocument(uri);
     await vscode.window.showTextDocument(doc, { preview, preserveFocus });
