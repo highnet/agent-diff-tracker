@@ -184,11 +184,6 @@
           "default": 1,
           "description": "Minimum number of files that must change together (within debounceMs) before a diff is auto-opened. Set to 2+ to ignore lone manual edits and only react to agent-style bursts; changes below the threshold still appear in the History view."
         },
-        "agentDiffTracker.maxAutoOpenFiles": {
-          "type": "number",
-          "default": 4,
-          "description": "Maximum number of diff tabs to auto-open at once for a single batch of changes. Remaining files are still recorded in the History view."
-        },
         "agentDiffTracker.maxHistoryEntries": {
           "type": "number",
           "default": 50,

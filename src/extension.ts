@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { HistoryProvider } from './historyProvider';
 import { shouldIgnorePath } from './matching';
-import { planBatch, clampDebounceMs } from './batchPlan';
+import { shouldAutoOpen, clampDebounceMs } from './batchPlan';
 import { firstChangedLine } from './firstChange';
 
 type GitApi = {
@@ -58,7 +58,6 @@ const toEmptyBaselineUri = (uri: vscode.Uri): vscode.Uri =>
   uri.with({ scheme: EMPTY_SCHEME, query: '' });
 
 type OpenDiffOptions = {
-  preview: boolean;
   // True for explicit user navigation (history clicks, "show latest") — the diff should
   // take keyboard focus. Auto-opens leave focus alone per the preserveFocus setting.
   takeFocus: boolean;
@@ -83,12 +82,16 @@ const openDiffForUri = async (uri: vscode.Uri, options: OpenDiffOptions): Promis
     return; // unreadable — nothing sensible to show
   }
 
+  // Always a preview tab: only one "Agent Diff Tracker" diff exists at a time, and
+  // opening the next one replaces it — VS Code's native preview mechanic. A user who
+  // wants to keep a specific diff around can pin its tab, which takes it out of the
+  // preview slot so the next auto-open opens a fresh tab instead of replacing it.
   await vscode.commands.executeCommand(
     'vscode.diff',
     leftUri,
     uri,
     `${fileName} (Agent Diff Tracker)`,
-    { preview: options.preview, preserveFocus },
+    { preview: true, preserveFocus },
   );
 
   // Aim the cursor at the first changed line via the editor API — it works on
@@ -129,20 +132,15 @@ const flushBatch = async (): Promise<void> => {
   statusBarItem.text =
     batch.length > 1 ? `$(diff) Watching: ${batch.length} files changed` : `$(diff) Watching: ${fileNames[0]}`;
 
-  const plan = planBatch(
-    batch.length,
-    config.get<number>('minBurstFilesToAutoOpen', 1),
-    config.get<number>('maxAutoOpenFiles', 4),
-  );
-  if (plan.openCount === 0) return;
+  if (!shouldAutoOpen(batch.length, config.get<number>('minBurstFilesToAutoOpen', 1))) return;
 
-  const toOpen = batch.slice(0, plan.openCount);
-  for (const [index, uri] of toOpen.entries()) {
-    await openDiffForUri(uri, { preview: toOpen.length === 1 && index === 0, takeFocus: false });
-  }
-  if (plan.overflowCount > 0) {
+  // Only the most recent file gets the (single, reusable) diff tab — earlier files in
+  // the same burst are still recorded in history above, just not opened, since opening
+  // them in sequence would only flash through each one and land on this one anyway.
+  await openDiffForUri(batch[batch.length - 1], { takeFocus: false });
+  if (batch.length > 1) {
     void vscode.window.setStatusBarMessage(
-      `Agent Diff Tracker: ${plan.overflowCount} more file(s) changed — see History view`,
+      `Agent Diff Tracker: ${batch.length - 1} more file(s) in this burst — see History view`,
       4000,
     );
   }
@@ -201,11 +199,11 @@ const activate = async (context: vscode.ExtensionContext): Promise<void> => {
     vscode.commands.registerCommand('agentDiffTracker.showLatest', () => {
       // Prefer the still-pending batch (freshest), fall back to the last flushed change.
       const latest = pendingBatch[pendingBatch.length - 1] ?? lastChangedUri;
-      if (latest) void openDiffForUri(latest, { preview: false, takeFocus: true });
+      if (latest) void openDiffForUri(latest, { takeFocus: true });
       else void vscode.window.showInformationMessage('Agent Diff Tracker: no file changes seen yet.');
     }),
     vscode.commands.registerCommand('agentDiffTracker.openHistoryItem', (uri: vscode.Uri) => {
-      void openDiffForUri(uri, { preview: false, takeFocus: true });
+      void openDiffForUri(uri, { takeFocus: true });
     }),
     vscode.commands.registerCommand('agentDiffTracker.clearHistory', () => {
       historyProvider.clear();

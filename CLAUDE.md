@@ -25,6 +25,8 @@ npm run reinstall          # build + package + install into local VS Code (user 
 - Never steal-and-restore editor focus to drive diff navigation — restoring focus can hide or replace the diff tab just opened. Aim the cursor via `TextEditor.selection`/`revealRange` on the (possibly unfocused) editor found in `visibleTextEditors`, matched by **full URI including scheme** — the diff's left side (`git:`) shares the same `fsPath`.
 - External file changes reach open `TextDocument`s asynchronously and the reload restores prior view state — re-aim on `onDidChangeTextDocument` within a settle window rather than trusting a one-shot write.
 - Untracked files diff against the `agent-diff-tracker-empty:` content provider so every open is a labeled diff tab.
+- All diff opens use `preview: true` — exactly one "Agent Diff Tracker" tab exists at a time, and the next open replaces it (VS Code's native preview-tab mechanic). Do not reintroduce persistent (`preview: false`) tabs for auto-opens or history clicks; a user who wants to keep a diff pins its tab, which takes it out of the preview slot.
+- A multi-file burst opens a diff for only the *last* file — looping through the rest with `preview: true` would just flash through and replace itself, wasting the open. The rest of the burst is still recorded in history.
 - Config values from settings must be clamped (`batchPlan.ts`) — assume users enter garbage.
 - `.vscodeignore` must exclude tests, sources, and local tool dirs (`.claude/`, `.impeccable/`); verify `.vsix` contents after packaging changes.
 

@@ -13,9 +13,9 @@ It's agent-agnostic by design: it reacts to files changing on disk, so it works 
 
 ## Features
 
-- **Auto-opening diffs** — every change opens a `HEAD ↔ working tree` diff, jumped to the first edited line, without stealing your keyboard focus.
-- **Burst batching** — files changed together (one agent turn) are treated as one batch: diffs open for up to `maxAutoOpenFiles` of them, the rest land in history. A debounce window keeps rapid rewrites from flickering.
-- **Change History sidebar** — an activity-bar view of recent change bursts: each burst (one agent turn) is a collapsible group of the files it touched, stamped with a relative time. Click any file to reopen its diff — each opens in its own tab.
+- **One diff tab, always the latest edit** — every change opens the same reusable diff tab (`HEAD ↔ working tree`), jumped to the first edited line, without stealing your keyboard focus. The next change replaces it, so you're never hunting through a pile of stale diff tabs. Want to keep one around? Pin the tab (right-click → Pin, or `Cmd/Ctrl+K Enter`) and the next auto-open opens a fresh tab instead of touching it.
+- **Burst batching** — files changed together (one agent turn) are treated as one batch and recorded together in history; the diff tab shows the last file in the burst. A debounce window keeps rapid rewrites from flickering.
+- **Change History sidebar** — an activity-bar view of recent change bursts: each burst (one agent turn) is a collapsible group of the files it touched, stamped with a relative time. Click any file to reopen its diff in that same reusable tab.
 - **Manual-edit filtering (optional)** — set `minBurstFilesToAutoOpen` to `2+` and lone single-file saves (usually you typing) stop auto-opening, while multi-file agent bursts still do. Everything is still recorded in history.
 - **Sensible noise filtering** — build output, caches, and dependency directories across ecosystems (Node, Python, Rust, Go, Java, Ruby, .NET, Swift, Elixir, Terraform, and more) are excluded out of the box, with a hard safety net for the worst offenders (`.git`, `node_modules`, `__pycache__`, `target`, `Pods`, `*.tsbuildinfo`, `*.log`, …) that user config can't accidentally disable.
 - **One-click pause** — the status bar eye shows what was last touched; click it to pause/resume watching.
@@ -41,7 +41,6 @@ It's agent-agnostic by design: it reacts to files changing on disk, so it works 
 | `agentDiffTracker.exclude` | ~70 patterns | Globs to ignore; covers common build/cache/dependency dirs across ecosystems |
 | `agentDiffTracker.preserveFocus` | `true` | Keep your cursor where it is when diffs auto-open |
 | `agentDiffTracker.minBurstFilesToAutoOpen` | `1` | Only auto-open when at least N files change together |
-| `agentDiffTracker.maxAutoOpenFiles` | `4` | Cap on diff tabs opened per batch; the rest go to history |
 | `agentDiffTracker.maxHistoryEntries` | `50` | History length |
 
 ## FAQ

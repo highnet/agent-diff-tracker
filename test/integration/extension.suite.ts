@@ -74,7 +74,7 @@ describe('Agent Diff Tracker (integration)', function () {
     assert.ok(tabsAfter.length >= tabCountBefore);
   });
 
-  it('openHistoryItem opens each file in its own persistent tab and leaves focus there', async () => {
+  it('openHistoryItem reuses a single diff tab instead of piling up one per file', async () => {
     const fileA = path.join(workspaceRoot(), 'tracked.txt');
     const fileB = path.join(workspaceRoot(), 'tracked-b.txt');
     fs.writeFileSync(fileB, 'b1\n');
@@ -90,20 +90,85 @@ describe('Agent Diff Tracker (integration)', function () {
     await vscode.commands.executeCommand('agentDiffTracker.openHistoryItem', uriB);
     await sleep(500);
 
-    // Regression: history clicks used to reuse a single VS Code "preview" tab, so opening a
-    // second history item silently replaced the first. Both files must now have their own
-    // persistent (non-preview) diff tab. (VS Code may promote an existing preview tab for
-    // the same diff rather than adding a new one, so tab COUNT is not a valid assertion.)
-    const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs);
-    const tabA = tabs.find((t) => t.label.includes('tracked.txt') && t.label.includes('Agent Diff Tracker'));
-    const tabB = tabs.find((t) => t.label.includes('tracked-b.txt') && t.label.includes('Agent Diff Tracker'));
-    assert.ok(tabA && !tabA.isPreview, `expected a persistent diff tab for tracked.txt, got: ${JSON.stringify(tabs.map((t) => ({ label: t.label, preview: t.isPreview })))}`);
-    assert.ok(tabB && !tabB.isPreview, 'expected a persistent diff tab for tracked-b.txt');
+    // Regression: history clicks used to open a new persistent tab per file, so browsing
+    // through several history entries left a pile of stale "Agent Diff Tracker" tabs behind.
+    // There should only ever be one — the tab for whichever file was opened last.
+    const diffTabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => t.label.includes('Agent Diff Tracker'));
+    assert.strictEqual(
+      diffTabs.length,
+      1,
+      `expected exactly one Agent Diff Tracker tab, got: ${JSON.stringify(diffTabs.map((t) => t.label))}`,
+    );
+    assert.ok(diffTabs[0].label.includes('tracked-b.txt'), `expected the single tab to show the file opened last, got: ${diffTabs[0].label}`);
 
     const activeLabel = vscode.window.tabGroups.activeTabGroup.activeTab?.label ?? '';
     assert.ok(
       activeLabel.includes('tracked-b.txt'),
       `expected focus to remain on the diff the user just opened, got active tab: ${activeLabel}`,
+    );
+  });
+
+  it('pinning the diff tab keeps it open when the next change comes in', async () => {
+    const fileA = path.join(workspaceRoot(), 'tracked.txt');
+    const fileB = path.join(workspaceRoot(), 'tracked-b.txt');
+
+    await vscode.commands.executeCommand('agentDiffTracker.openHistoryItem', vscode.Uri.file(fileA));
+    await sleep(500);
+
+    const tabBeforePin = vscode.window.tabGroups.all
+      .flatMap((g) => g.tabs)
+      .find((t) => t.label.includes('Agent Diff Tracker') && t.label.includes('tracked.txt'));
+    assert.ok(tabBeforePin, 'expected a diff tab for tracked.txt before pinning');
+    assert.ok(tabBeforePin!.isPreview, 'expected the tab to start as a preview tab');
+
+    await vscode.commands.executeCommand('workbench.action.pinEditor');
+    await sleep(200);
+    const tabAfterPin = vscode.window.tabGroups.all
+      .flatMap((g) => g.tabs)
+      .find((t) => t.label.includes('Agent Diff Tracker') && t.label.includes('tracked.txt'));
+    assert.ok(tabAfterPin && !tabAfterPin.isPreview, 'expected the tab to no longer be a preview after pinning');
+
+    // A new change to a different file should open its own tab, leaving the pinned one alone.
+    fs.appendFileSync(fileB, 'pin-test\n');
+    await sleep(2500);
+
+    const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => t.label.includes('Agent Diff Tracker'));
+    const pinnedStillThere = tabs.some((t) => t.label.includes('tracked.txt'));
+    const newOneOpened = tabs.some((t) => t.label.includes('tracked-b.txt'));
+    assert.ok(pinnedStillThere, `expected the pinned tracked.txt tab to survive, got: ${JSON.stringify(tabs.map((t) => t.label))}`);
+    assert.ok(newOneOpened, 'expected a new tab for tracked-b.txt alongside the pinned one');
+    assert.strictEqual(tabs.length, 2, `expected exactly the pinned tab plus one new tab, got: ${JSON.stringify(tabs.map((t) => t.label))}`);
+
+    // Unpin so later tests (which assume a single reusable tab) start from a clean slate.
+    await vscode.window.tabGroups.close(tabAfterPin!);
+  });
+
+  it('a multi-file burst opens only one diff tab, for the last file in the burst', async () => {
+    const fileA = path.join(workspaceRoot(), 'tracked.txt');
+    const fileB = path.join(workspaceRoot(), 'tracked-b.txt');
+
+    // Close any tabs left from earlier tests so the count assertion below is unambiguous.
+    for (const tab of vscode.window.tabGroups.all.flatMap((g) => g.tabs)) {
+      if (tab.label.includes('Agent Diff Tracker')) await vscode.window.tabGroups.close(tab);
+    }
+
+    // Two files changed within the same debounce window == one burst.
+    fs.appendFileSync(fileA, 'burst-a\n');
+    fs.appendFileSync(fileB, 'burst-b\n');
+    await sleep(2500);
+
+    const diffTabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs).filter((t) => t.label.includes('Agent Diff Tracker'));
+    assert.strictEqual(
+      diffTabs.length,
+      1,
+      `expected exactly one diff tab for a multi-file burst, got: ${JSON.stringify(diffTabs.map((t) => t.label))}`,
+    );
+    // Which of the two files "wins" depends on filesystem watcher event ordering between
+    // two different files, which isn't guaranteed — the invariant that matters is that
+    // there's exactly one tab (asserted above), not which specific file it shows.
+    assert.ok(
+      diffTabs[0].label.includes('tracked.txt') || diffTabs[0].label.includes('tracked-b.txt'),
+      `expected the tab to show one of the two burst files, got: ${diffTabs[0].label}`,
     );
   });
 

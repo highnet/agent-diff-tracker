@@ -1,39 +1,30 @@
 import * as assert from 'assert';
-import { planBatch, clampDebounceMs } from '../../src/batchPlan';
+import { shouldAutoOpen, clampDebounceMs } from '../../src/batchPlan';
 
-describe('planBatch', () => {
-  it('opens every file when the batch fits within maxAutoOpen', () => {
-    assert.deepStrictEqual(planBatch(3, 1, 4), { openCount: 3, overflowCount: 0 });
+describe('shouldAutoOpen', () => {
+  it('opens when the batch meets the burst threshold', () => {
+    assert.strictEqual(shouldAutoOpen(1, 1), true);
+    assert.strictEqual(shouldAutoOpen(3, 1), true);
+    assert.strictEqual(shouldAutoOpen(2, 2), true);
   });
 
-  it('caps at maxAutoOpen and reports the overflow', () => {
-    assert.deepStrictEqual(planBatch(10, 1, 4), { openCount: 4, overflowCount: 6 });
-  });
-
-  it('opens nothing when the batch is below the burst threshold', () => {
-    assert.deepStrictEqual(planBatch(1, 2, 4), { openCount: 0, overflowCount: 0 });
-  });
-
-  it('opens when the batch exactly meets the burst threshold', () => {
-    assert.deepStrictEqual(planBatch(2, 2, 4), { openCount: 2, overflowCount: 0 });
+  it('does not open when the batch is below the burst threshold', () => {
+    assert.strictEqual(shouldAutoOpen(1, 2), false);
   });
 
   it('clamps a zero or negative minBurstFiles to 1 instead of never opening', () => {
-    assert.deepStrictEqual(planBatch(1, 0, 4), { openCount: 1, overflowCount: 0 });
-    assert.deepStrictEqual(planBatch(1, -5, 4), { openCount: 1, overflowCount: 0 });
+    assert.strictEqual(shouldAutoOpen(1, 0), true);
+    assert.strictEqual(shouldAutoOpen(1, -5), true);
   });
 
-  it('clamps a zero or negative maxAutoOpen to 1 instead of opening nothing forever', () => {
-    assert.deepStrictEqual(planBatch(3, 1, 0), { openCount: 1, overflowCount: 2 });
-    assert.deepStrictEqual(planBatch(3, 1, -1), { openCount: 1, overflowCount: 2 });
-  });
-
-  it('tolerates NaN config values by falling back to safe minimums', () => {
-    assert.deepStrictEqual(planBatch(2, NaN, NaN), { openCount: 1, overflowCount: 1 });
+  it('tolerates NaN config by falling back to a safe minimum', () => {
+    assert.strictEqual(shouldAutoOpen(1, NaN), true);
+    assert.strictEqual(shouldAutoOpen(0, NaN), false);
   });
 
   it('floors fractional config values', () => {
-    assert.deepStrictEqual(planBatch(3, 1.9, 2.9), { openCount: 2, overflowCount: 1 });
+    assert.strictEqual(shouldAutoOpen(1, 1.9), true);
+    assert.strictEqual(shouldAutoOpen(2, 1.9), true);
   });
 });
 
